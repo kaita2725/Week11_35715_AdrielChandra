@@ -3,28 +3,26 @@ import {IonPage, IonHeader, IonToolbar, IonButtons, IonButton, IonTitle, IonIcon
 import { useEffect, useState } from "react";
 import { isPlatform} from '@ionic/react';
 import {addOutline} from "ionicons/icons";
-import { Foto, UrlSelectGoodMemories } from "../data/UrlDatabase";
-
-interface Memory {
-  id: string;
-  title: string;
-  type: string;
-  photo: string;
-}
+import { collection, getDocs, query, where } from "firebase/firestore"
+import { getFirestore } from "firebase/firestore";
 
 const GoodMemories: React.FC = () => {
-    const urlSelect = UrlSelectGoodMemories;
-    const foto = Foto;
-    const [memories, setMemories] = useState<Memory[]>([]);
+    const db = getFirestore();
+    const [memories, setMemories] = useState<Array<any>>([]);
 
+    const dbquery = query(collection(db, "memory"), where("type", "==", "good"));
     useEffect(() => {
-      setInterval(() => {
-        fetch(UrlSelectGoodMemories)
-        .then((response) => response.json())
-        .then((data) => {
-          data.memories === undefined ? setMemories([]): setMemories(data.memories);
-        });
-      }, 1000);
+      async function getData() {
+        const querySnapshot = await getDocs(dbquery);
+        console.log('querySnapshot: ', querySnapshot);
+        setMemories(querySnapshot.docs.map((doc) => ({...doc.data(), id:doc.id})));
+
+        querySnapshot.forEach((doc) => {
+          console.log(`${doc.id} => ${doc.data()}`);
+          console.log('doc:', doc);
+        })
+      }
+      getData();
     }, []);
 
     return (
@@ -69,9 +67,9 @@ const GoodMemories: React.FC = () => {
                 <IonRow key={memory.id}>
                   <IonCol>
                     <IonCard>
-                      <img src={foto + (memory.photo ? memory.photo : "uploads/ITIX.png")} />
+                      <img src={(memory.fotoUrl)} />
                       <IonCardHeader>
-                        <IonCardTitle>{memory.title}</IonCardTitle>
+                        <IonCardTitle>{memory.titleRef}</IonCardTitle>
                       </IonCardHeader>
                     </IonCard>
                   </IonCol>

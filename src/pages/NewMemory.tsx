@@ -1,10 +1,12 @@
 import React from "react";
 import { useState, useRef} from "react";
 import { useHistory } from "react-router-dom";
-import {IonPage, IonGrid, IonHeader, IonToolbar, IonTitle,  IonSelect, IonSelectOption, IonContent, IonButtons, IonBackButton, IonLabel, IonIcon, IonRow, IonCol, IonButton, IonInput, useIonAlert} from "@ionic/react";
+import {IonPage, IonGrid, IonHeader, IonToolbar, IonTitle,  IonSelect, IonSelectOption, IonContent, IonButtons, IonBackButton, IonLabel, IonIcon, IonRow, IonCol, IonButton, IonInput} from "@ionic/react";
 import {camera} from "ionicons/icons";
 import {Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { UrlInsertMemories } from "../data/UrlDatabase";
+import { collection, addDoc } from "firebase/firestore"
+import { getFirestore } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const NewMemories: React.FC = () => {
     const [takenPhoto, setTakenPhoto] = useState<{
@@ -14,13 +16,29 @@ const NewMemories: React.FC = () => {
     const [chosenMemoryType, setChosenMemoryType] = useState<'good' | 'bad'>('good');
     const titleRef = useRef<HTMLIonInputElement>(null);
     const [selectedFile, setSelectedFile] = useState<File>();
-    const urlInsert = UrlInsertMemories;
-    const [present] = useIonAlert();
+    const [fileName, setFileName] = useState('');
     const history = useHistory();
+
+    const db = getFirestore();
+    const storage = getStorage();
 
     const selectMemoryTypehandler = (event: CustomEvent) => {
       const selectedMemoryType = event.detail.value;
       setChosenMemoryType(selectedMemoryType);
+    }
+
+    const addData = async(url: string, title: string) =>{
+      try {
+        const docRef = await addDoc(collection(db, "memory"), {
+          titleRef: title,
+          type: chosenMemoryType,
+          foto: fileName,
+          fotoUrl: url
+        });
+        console.log("Document written with ID: ", docRef.id);
+      } catch (e) {
+        console.error("Error adding Document: ", e);
+      }
     }
 
     const addMemoryHandler = async () =>{
@@ -28,29 +46,14 @@ const NewMemories: React.FC = () => {
       if(!enteredTitle || enteredTitle.toString().trim().length === 0 || !takenPhoto || !chosenMemoryType){
         return;
       }
-
-      const formData = new FormData();
-      const title = titleRef?.current.value as string;
-      const type = chosenMemoryType as string;
-      const photoName = (new Date().getTime() + ".jpeg") as string;
-      formData.append("title", title);
-      formData.append("type", type);
-      formData.append("photo", selectedFile as File);
-      formData.append("photoName", photoName);
-
-      fetch(urlInsert, {
-      method: "post",
-      body: formData,
+      const title= titleRef.current?.value as string;
+      const storageRef = ref(storage, fileName);
+      uploadBytes(storageRef, selectedFile as Blob).then((snapshot) => {
+        console.log('upload file success');
+        getDownloadURL(ref(storage, fileName)).then((url) => {
+          addData(url, title);
+        })
       })
-        .then((response) => response.text())
-        .then((data) => {
-          const dataObj = JSON.parse(data);
-          present({
-            message: dataObj["message"],
-            header: dataObj["success"] === 1 ? "Success" : "Failed",
-            buttons: ["Ok"],
-          });
-        });
 
       if(chosenMemoryType == 'good'){
         history.length > 0 ? history.goBack() : history.replace('/good-memories');
@@ -72,6 +75,8 @@ const NewMemories: React.FC = () => {
       const response = await fetch(photo.webPath!);
       const blob = await response.blob();
       setSelectedFile(blob as File);
+      const photoName = (new Date().getTime() + ".jpeg") as string;
+      setFileName(photoName);
 
       if(!photo || /* !photo.path || */ !photo.webPath)
       {
@@ -80,7 +85,7 @@ const NewMemories: React.FC = () => {
 
       setTakenPhoto(
         {
-          path: photo.path,
+          path: photo.path ? photo.path : "",
           preview: photo.webPath
         });
     };

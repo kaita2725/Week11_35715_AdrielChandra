@@ -1,28 +1,27 @@
 import React from "react";
 import {IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonButtons, IonMenuButton} from "@ionic/react";
 import { useEffect, useState } from "react";
-import { Foto, UrlSelectBadMemories } from "../data/UrlDatabase";
-
-interface Memory {
-  id: string;
-  title: string;
-  type: string;
-  photo: string;
-}
+import { collection, getDocs,query, where } from "firebase/firestore"
+import { getFirestore } from "firebase/firestore";
 
 const BadMemories: React.FC = () => {
-    const urlSelect = UrlSelectBadMemories;
-    const foto = Foto;
-    const [memories, setMemories] = useState<Memory[]>([]);
+    const db = getFirestore();
+    const [memories, setMemories] = useState<Array<any>>([]);
+
+    const dbquery = query(collection(db, "memory"), where("type", "==", "bad"));
 
     useEffect(() => {
-      setInterval(() => {
-        fetch(UrlSelectBadMemories)
-        .then((response) => response.json())
-        .then((data) => {
-          data.memories === undefined ? setMemories([]): setMemories(data.memories);
-        });
-      }, 1000);
+      async function getData() {
+        const querySnapshot = await getDocs(dbquery);
+        console.log('querySnapshot: ', querySnapshot);
+        setMemories(querySnapshot.docs.map((doc) => ({...doc.data(), id:doc.id})));
+
+        querySnapshot.forEach((doc) => {
+          console.log(`${doc.id} => ${doc.data()}`);
+          console.log('doc:', doc);
+        })
+      }
+      getData();
     }, []);
 
     return (
@@ -53,9 +52,9 @@ const BadMemories: React.FC = () => {
               <IonRow key={memory.id}>
                 <IonCol>
                   <IonCard>
-                    <img src={foto + (memory.photo ? memory.photo : "uploads/ITIX.png")} />
+                    <img src={(memory.fotoUrl)} />
                     <IonCardHeader>
-                      <IonCardTitle>{memory.title}</IonCardTitle>
+                      <IonCardTitle>{memory.titleRef}</IonCardTitle>
                     </IonCardHeader>
                   </IonCard>
                 </IonCol>
